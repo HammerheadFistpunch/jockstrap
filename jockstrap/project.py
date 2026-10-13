@@ -46,6 +46,9 @@ class Radio:
     tilt_deg: float = 0
     max_clients: int | None = None
     assumptions: str = "TX power and RX threshold are editable planning assumptions."
+    hardware_revision: str = "unspecified"
+    wireless_mode: str = "standard"
+    antenna_pattern: str = "directional"
     id: str = field(default_factory=new_id)
 
 
@@ -89,7 +92,7 @@ class Project:
         for site in self.sites:
             bounded("Latitude", site.lat, -90, 90)
             bounded("Longitude", site.lon, -180, 180)
-        limits = dict(frequency_ghz=(1, 10), channel_width_mhz=(5, 160),
+        limits = dict(frequency_ghz=(1, 10), channel_width_mhz=(5, 320),
                       tx_power_dbm=(-20, 60), rx_threshold_dbm=(-140, -20), gain_dbi=(-10, 60),
                       az_beamwidth_deg=(1, 360), el_beamwidth_deg=(1, 180),
                       pattern_floor_db=(0, 60), height_m=(0.5, 500), feeder_loss_db=(0, 30),
@@ -103,6 +106,12 @@ class Project:
                 raise ValueError("Sectors need a fixed aim; clients/PTP may aim at their peer.")
             if radio.polarization not in ("horizontal", "vertical", "dual"):
                 raise ValueError("Choose horizontal, vertical or dual polarization.")
+            if radio.wireless_mode not in ("standard", "maxtream", "tdma", "mesh"):
+                raise ValueError("Choose standard, maxtream, tdma or mesh wireless mode.")
+            if radio.antenna_pattern not in ("directional", "omni"):
+                raise ValueError("Choose directional or omni antenna pattern.")
+            if not isinstance(radio.hardware_revision, str):
+                raise ValueError("Hardware revision must be text.")
             if radio.max_clients is not None and (type(radio.max_clients) is not int or radio.max_clients < 1):
                 raise ValueError("Client limit must be a positive integer.")
             for key, (low, high) in limits.items():

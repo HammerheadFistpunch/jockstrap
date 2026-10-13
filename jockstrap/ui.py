@@ -8,13 +8,14 @@ import tkinter as tk
 import threading
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .equipment import PRESETS, make_radio
+from .equipment import PRESETS, make_radio, CATALOG
+from .compatibility import compatibility
 from .project import Project, Radio, Site, Link
 from .terrain import GEOD
 
 
 class EditDialog(tk.Toplevel):
-    def __init__(self, owner, title, fields, values, on_save, preset_callback=None):
+    def __init__(self, owner, title, fields, values, on_save, preset_callback=None, status_callback=None):
         super().__init__(owner)
         self.title(title)
         self.transient(owner)
@@ -39,7 +40,16 @@ class EditDialog(tk.Toplevel):
             control.grid(row=row, column=1, sticky="ew", pady=5)
             if key == "equipment" and preset_callback:
                 control.bind("<<ComboboxSelected>>", lambda event: preset_callback(self.variables))
-        ttk.Label(form, text="Power and receiver threshold are planning assumptions. Set values for the intended bandwidth and modulation. Peer aiming applies only to a single link.", wraplength=530).grid(row=len(fields), column=0, columnspan=2, sticky="w", pady=12)
+        if status_callback:
+            note = tk.StringVar()
+            def update_note(*_):
+                note.set(status_callback({k:v.get() for k,v in self.variables.items()}))
+            for var in self.variables.values():
+                var.trace_add('write', update_note)
+            update_note()
+            ttk.Label(form, textvariable=note, wraplength=530).grid(row=len(fields), column=0, columnspan=2, sticky='w', pady=12)
+        else:
+            ttk.Label(form, text="Power and receiver threshold are planning assumptions. Set values for the intended bandwidth and modulation. Peer aiming applies only to a single link.", wraplength=530).grid(row=len(fields), column=0, columnspan=2, sticky="w", pady=12)
         ttk.Button(form, text="Save", command=self.save).grid(row=len(fields)+1, column=1, sticky="e")
         self.grab_set()
 
@@ -78,6 +88,7 @@ class Planner(tk.Tk):
         model_box.pack(side="left")
         model_box.bind("<<ComboboxSelected>>", lambda event: self.changed())
         ttk.Button(toolbar, text="Path settings", command=self.path_settings).pack(side="left", padx=4)
+        ttk.Button(toolbar, text="Radio catalog", command=self.radio_catalog).pack(side="left", padx=4)
         self.status = tk.StringVar(value="Add sites on the map, add radios, then connect them. Analyze without terrain gives provisional free-space results.")
         ttk.Label(self, textvariable=self.status, padding=8, wraplength=1300).pack(fill="x")
         split = ttk.Panedwindow(self, orient="horizontal")
@@ -88,7 +99,7 @@ class Planner(tk.Tk):
         split.add(map_frame, weight=3)
         self.sites_table = self.table(sidebar, "Sites", ("Location",), self.edit_site, self.delete_site)
         self.radios_table = self.table(sidebar, "Radios / antennas", ("Site", "Role", "Equipment"), self.edit_radio, self.delete_radio)
-        self.links_table = self.table(sidebar, "Wireless links", ("Status", "A → B dBm", "B → A dBm"), self.inspect_link, self.delete_link)
+        self.links_table = self.table(sidebar, "Wireless links", ("Status", "Pairing", "A → B dBm", "B → A dBm"), self.inspect_link, self.delete_link)
         ttk.Button(sidebar, text="Edit selected link", command=self.edit_link).pack(fill="x", pady=3)
         ttk.Button(sidebar, text="Export analysis JSON", command=self.export).pack(fill="x", pady=3)
         self.details = tk.Text(sidebar, height=8, wrap="word", state="disabled")
@@ -172,8 +183,12 @@ class Planner(tk.Tk):
             self.radio_dialog(radio, True)
 
     def radio_dialog(self, radio, existing):
-        fields = [("name", "Radio name", None), ("equipment", "Equipment preset", tuple(PRESETS)),
-                  ("role", "Role", ("sector", "client", "ptp")), ("protocol", "Protocol family", ("custom", "airmax-ac", "ltu", "wifi-ax", "epmp", "omada-bridge", "pharos-ac")),
+        visible = tuple(name for name in PRESETS if not CATALOG.get(name,{}).get('hidden'))
+        fields = [("name", "Radio name", None), ("equipment", "Equipment preset", visible),
+                  ("role", "Role", ("sector", "client", "ptp")), ("protocol", "Protocol family", ("custom", "airmax-ac", "ltu", "wifi-ax", "epmp", "omada-bridge", "omada-mesh", "pharos-ac", "pharos-n")),
+                  ("hardware_revision", "Hardware revision", None),
+                  ("wireless_mode", "Wireless mode", ("standard", "maxtream", "tdma", "mesh")),
+                  ("antenna_pattern", "Antenna pattern", ("directional", "omni")),
                   ("frequency_ghz", "Frequency (GHz)", None), ("channel_width_mhz", "Channel width (MHz)", None),
                   ("height_m", "Height above terrain (m)", None), ("tx_power_dbm", "TX power per channel (dBm)", None),
                   ("rx_threshold_dbm", "RX threshold for target mode (dBm)", None), ("gain_dbi", "Antenna gain (dBi)", None),
@@ -185,18 +200,21 @@ class Planner(tk.Tk):
         def preset(variables):
             name = variables['equipment'].get()
             new = asdict(make_radio(radio.site_id, name))
-            for key in ("role", "protocol", "gain_dbi", "az_beamwidth_deg", "el_beamwidth_deg", "aim", "max_clients", "assumptions"):
+            for key in ("role", "protocol", "gain_dbi", "az_beamwidth_deg", "el_beamwidth_deg", "aim", "max_clients", "assumptions", "frequency_ghz", "polarization", "hardware_revision", "wireless_mode", "antenna_pattern"):
                 variables[key].set("" if new[key] is None else str(new[key]))
         def save(values):
             candidate = copy.deepcopy(self.project)
-            numbers = {key for key, _, choices in fields if choices is None} - {"name", "assumptions", "max_clients"}
+            numbers = {key for key, _, choices in fields if choices is None} - {"name", "assumptions", "max_clients", "hardware_revision"}
             for key in numbers:
                 values[key] = float(values[key])
             values['max_clients'] = int(values['max_clients']) if values['max_clients'].strip() else None
             obj = Radio(site_id=radio.site_id, id=radio.id, **values)
             candidate.radios = [obj if r.id == radio.id else r for r in candidate.radios] if existing else [*candidate.radios, obj]
             self.apply(candidate)
-        EditDialog(self, "Radio and antenna properties", fields, asdict(radio), save, preset)
+        def description(values):
+            entry=CATALOG.get(values['equipment'])
+            return f"{entry['category']} | {entry['status']} | Checked {entry['checked']}\n{entry['note']}\n{entry['source']}" if entry else 'Editable planning preset. Confirm actual hardware and operating mode.'
+        EditDialog(self, "Radio and antenna properties", fields, asdict(radio), save, preset, description)
 
     def add_link(self):
         if len(self.project.radios) < 2:
@@ -219,7 +237,57 @@ class Planner(tk.Tk):
             obj = Link(values['name'], labels[values['a']], labels[values['b']], float(values['reserve_db']), float(values['extra_loss_db']), id=link.id)
             candidate.links = [obj if l.id == link.id else l for l in candidate.links] if existing else [*candidate.links, obj]
             self.apply(candidate)
-        EditDialog(self, "Connect two radios", [("name", "Link name", None), ("a", "Radio A", tuple(labels)), ("b", "Radio B", tuple(labels)), ("reserve_db", "Required reserve (dB)", None), ("extra_loss_db", "Additional combined loss (dB)", None)], values, save)
+        def pairing(values):
+            radios={r.id:r for r in self.project.radios}
+            result=compatibility(radios[labels[values['a']]],radios[labels[values['b']]])
+            return f"Compatibility: {result['status']}\n{result['reason']}"
+        EditDialog(self, "Connect two radios", [("name", "Link name", None), ("a", "Radio A", tuple(labels)), ("b", "Radio B", tuple(labels)), ("reserve_db", "Required reserve (dB)", None), ("extra_loss_db", "Additional combined loss (dB)", None)], values, save, status_callback=pairing)
+
+    def radio_catalog(self):
+        window=tk.Toplevel(self)
+        window.title('TP-Link outdoor radio catalog and compatibility')
+        window.geometry('1150x750')
+        ttk.Label(window,text='US-listed outdoor radios/APs, plus labelled regional, older-revision and coming-soon models. Checked 2026-10-13. Match bands, revisions and wireless mode; shared management is not shared radio compatibility.',wraplength=1100,padding=10).pack(fill='x')
+        table=ttk.Treeview(window,columns=('Category','Availability','Bands'),height=15)
+        table.heading('#0',text='Equipment / band / hardware')
+        table.column('#0',width=430)
+        for column in ('Category','Availability','Bands'):
+            table.heading(column,text=column)
+            table.column(column,width=180)
+        table.pack(fill='both',expand=True,padx=10)
+        for name,entry in CATALOG.items():
+            if not entry.get('hidden'):
+                table.insert('','end',iid=name,text=name,values=(entry['category'],entry['status'],', '.join(str(b) for b in entry['bands'])+' GHz'))
+        note=tk.StringVar(value='Select a product to see its pairing rules and manufacturer reference.')
+        ttk.Label(window,textvariable=note,wraplength=1100,padding=10).pack(fill='x')
+        selected_source=['']
+        def selected(*_):
+            if table.selection():
+                entry=CATALOG[table.selection()[0]]
+                note.set(entry['note']+'\n'+entry['source'])
+                selected_source[0]=entry['source']
+        table.bind('<<TreeviewSelect>>',selected)
+        def reference():
+            if selected_source[0]:
+                import webbrowser
+                webbrowser.open(selected_source[0])
+        ttk.Button(window,text='Open manufacturer reference',command=reference).pack(anchor='w',padx=10)
+        form=ttk.Frame(window,padding=10)
+        form.pack(fill='x')
+        names=tuple(name for name in CATALOG if not CATALOG[name].get('hidden'))
+        a,b=tk.StringVar(value='TP-Link CPE710'),tk.StringVar(value='TP-Link CPE710')
+        for label,var in (('Compare A',a),('Compare B',b)):
+            ttk.Label(form,text=label).pack(side='left',padx=4)
+            ttk.Combobox(form,textvariable=var,values=names,state='readonly',width=42).pack(side='left')
+        compared=tk.StringVar()
+        def compare(*_):
+            first,second=make_radio('catalog-a',a.get()),make_radio('catalog-b',b.get())
+            result=compatibility(first,second)
+            compared.set(f"{result['status']}: {result['reason']}\nUses default bands/modes; link editor checks your actual radio settings.")
+        a.trace_add('write',compare)
+        b.trace_add('write',compare)
+        compare()
+        ttk.Label(window,textvariable=compared,wraplength=1100,padding=10).pack(fill='x')
 
     def delete_site(self):
         site = self.selected(self.sites_table, self.project.sites)
@@ -314,7 +382,8 @@ class Planner(tk.Tk):
         for link in self.project.links:
             result = self.results.get(link.id, {})
             signals = [f"{result[key]['rx_dbm']:.1f}" if key in result else '—' for key in ('forward', 'reverse')]
-            self.links_table.insert('', 'end', iid=link.id, text=link.name, values=(result.get('status', 'Not analyzed'), *signals))
+            pairing = compatibility(radios[link.a_radio_id],radios[link.b_radio_id])
+            self.links_table.insert('', 'end', iid=link.id, text=link.name, values=(result.get('status', 'Not analyzed'), pairing['status'], *signals))
         self.details.configure(state="normal")
         self.details.delete('1.0', 'end')
         self.details.configure(state="disabled")
@@ -325,7 +394,7 @@ class Planner(tk.Tk):
         for site in self.project.sites:
             self.map.set_marker(site.lat, site.lon, text=site.name)
         for radio in self.project.radios:
-            if radio.aim == 'fixed':
+            if radio.aim == 'fixed' and radio.antenna_pattern != 'omni':
                 site = sites[radio.site_id]
                 positions = []
                 for angle in (radio.azimuth_deg - radio.az_beamwidth_deg/2, radio.azimuth_deg, radio.azimuth_deg + radio.az_beamwidth_deg/2):
@@ -353,6 +422,8 @@ class Planner(tk.Tk):
         if 'error' in result:
             return result['status'] + '\n' + result['error']
         text = f"{result['name']} — {result['status']}\n{result['distance_km']:.2f} km | {result['model']}\n"
+        if result.get('compatibility'):
+            text += f"Compatibility: {result['compatibility']['status']} — {result['compatibility']['reason']}\n"
         for key in ('forward', 'reverse'):
             direction = result[key]
             text += f"{direction['tx_radio']} → {direction['rx_radio']}: {direction['rx_dbm']:.1f} dBm; margin after reserve {direction['margin_db']:+.1f} dB\n"

@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass, field
 import math
 
 from .terrain import GEOD
+from .compatibility import compatibility
 
 C = 299792458
 EARTH_RADIUS_M = 6371000
@@ -19,6 +20,8 @@ def antenna_loss(radio, bearing, elevation):
     if radio.aim == "peer":
         return 0.
     az = (bearing - radio.azimuth_deg + 180) % 360 - 180
+    if radio.antenna_pattern == 'omni':
+        az = 0
     el = elevation - radio.tilt_deg
     return min(radio.pattern_floor_db,
                12 * (az / radio.az_beamwidth_deg) ** 2 + 12 * (el / radio.el_beamwidth_deg) ** 2)
@@ -55,6 +58,7 @@ class LinkResult:
     elevation_b_deg: float
     warnings: list[str] = field(default_factory=list)
     profile: dict | None = None
+    compatibility: dict | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -73,15 +77,9 @@ def analyze_link(project, link, profile=None, model="knife-edge"):
         raise ValueError("Initial path engine supports 1 m–200 km links.")
     warnings = [a.assumptions, b.assumptions,
                 "No throughput, airtime, interference, rain fading or availability prediction."]
-    compatible = True
-    if abs(a.frequency_ghz - b.frequency_ghz) > 1e-6 or abs(a.channel_width_mhz - b.channel_width_mhz) > 1e-6:
-        warnings.append("Radio frequency/channel width mismatch; radios cannot form this configured link.")
-        compatible = False
-    if a.protocol != b.protocol and "custom" not in (a.protocol, b.protocol):
-        warnings.append("Different radio protocol families; RF strength does not establish interoperability.")
-        compatible = False
-    if "custom" in (a.protocol, b.protocol):
-        warnings.append("Generic equipment: protocol interoperability is unverified.")
+    pairing = compatibility(a,b)
+    compatible = pairing['status'] != 'Incompatible'
+    warnings.append(f"Compatibility: {pairing['status']} — {pairing['reason']}")
     pol_loss = 0.
     if {a.polarization, b.polarization} == {"horizontal", "vertical"}:
         warnings.append("Cross-polarized H/V endpoints: 20 dB mismatch is an assumed value, not a hardware specification.")
@@ -166,7 +164,7 @@ def analyze_link(project, link, profile=None, model="knife-edge"):
         status = "Meets planning checks"
     return LinkResult(link.id, link.name, distance / 1000, status, model_name, forward, reverse,
                       fspl, path_loss, diffraction, clearance_fresnel, clearance_los,
-                      bearing_a % 360, bearing_b % 360, ea, eb, list(dict.fromkeys(warnings)), plot)
+                      bearing_a % 360, bearing_b % 360, ea, eb, list(dict.fromkeys(warnings)), plot, pairing)
 
 
 def analyze_network(project, terrain=None, model="knife-edge"):

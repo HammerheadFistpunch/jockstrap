@@ -53,9 +53,10 @@ def run_self_test(gui=True):
                 app.refresh()
                 app.links_table.selection_set(project.links[0].id)
                 app.inspect_link()
+                app.radio_catalog()
                 app.update_idletasks()
                 app.update()
-                checks.append("Tk editor, map widget and TkAgg terrain-profile window")
+                checks.append("Tk editor, map widget, radio catalog and TkAgg terrain-profile window")
             finally:
                 app.destroy()
     example = Path(__file__).resolve().parents[1] / "examples" / "sector_network.json"
