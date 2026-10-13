@@ -1,0 +1,157 @@
+{
+  "name": "Example: one sector and three clients",
+  "sites": [
+    {
+      "name": "Central sector",
+      "lat": 40.6,
+      "lon": -111.9,
+      "id": "central"
+    },
+    {
+      "name": "Remote 1",
+      "lat": 40.6061578243864,
+      "lon": -111.87779396809398,
+      "id": "remote-1"
+    },
+    {
+      "name": "Remote 2",
+      "lat": 40.59999033260874,
+      "lon": -111.8527420108815,
+      "id": "remote-2"
+    },
+    {
+      "name": "Remote 3",
+      "lat": 40.57714736744944,
+      "lon": -111.83577642982212,
+      "id": "remote-3"
+    }
+  ],
+  "radios": [
+    {
+      "name": "East sector",
+      "site_id": "central",
+      "role": "sector",
+      "equipment": "Ubiquiti Rocket Prism + AM-5AC21-60",
+      "protocol": "airmax-ac",
+      "frequency_ghz": 5.8,
+      "channel_width_mhz": 20,
+      "tx_power_dbm": 20,
+      "rx_threshold_dbm": -85,
+      "gain_dbi": 21,
+      "az_beamwidth_deg": 60,
+      "el_beamwidth_deg": 4,
+      "pattern_floor_db": 30,
+      "height_m": 30,
+      "polarization": "dual",
+      "feeder_loss_db": 0,
+      "aim": "fixed",
+      "azimuth_deg": 90,
+      "tilt_deg": 0,
+      "max_clients": null,
+      "assumptions": "TX 20 dBm and RX -85 dBm are planning assumptions; replace for the selected bandwidth/MCS. Quadratic antenna pattern is approximate. Beamwidths are provisional editable approximations until verified against the specific antenna datasheet.",
+      "id": "sector"
+    },
+    {
+      "name": "Client 1",
+      "site_id": "remote-1",
+      "role": "client",
+      "equipment": "Ubiquiti LiteBeam 5AC Gen2",
+      "protocol": "airmax-ac",
+      "frequency_ghz": 5.8,
+      "channel_width_mhz": 20,
+      "tx_power_dbm": 20,
+      "rx_threshold_dbm": -85,
+      "gain_dbi": 23,
+      "az_beamwidth_deg": 7,
+      "el_beamwidth_deg": 7,
+      "pattern_floor_db": 30,
+      "height_m": 20,
+      "polarization": "dual",
+      "feeder_loss_db": 0,
+      "aim": "peer",
+      "azimuth_deg": 0,
+      "tilt_deg": 0,
+      "max_clients": null,
+      "assumptions": "TX 20 dBm and RX -85 dBm are planning assumptions; replace for the selected bandwidth/MCS. Quadratic antenna pattern is approximate. Beamwidths are provisional editable approximations until verified against the specific antenna datasheet.",
+      "id": "client-1"
+    },
+    {
+      "name": "Client 2",
+      "site_id": "remote-2",
+      "role": "client",
+      "equipment": "Ubiquiti LiteBeam 5AC Gen2",
+      "protocol": "airmax-ac",
+      "frequency_ghz": 5.8,
+      "channel_width_mhz": 20,
+      "tx_power_dbm": 20,
+      "rx_threshold_dbm": -85,
+      "gain_dbi": 23,
+      "az_beamwidth_deg": 7,
+      "el_beamwidth_deg": 7,
+      "pattern_floor_db": 30,
+      "height_m": 20,
+      "polarization": "dual",
+      "feeder_loss_db": 0,
+      "aim": "peer",
+      "azimuth_deg": 0,
+      "tilt_deg": 0,
+      "max_clients": null,
+      "assumptions": "TX 20 dBm and RX -85 dBm are planning assumptions; replace for the selected bandwidth/MCS. Quadratic antenna pattern is approximate. Beamwidths are provisional editable approximations until verified against the specific antenna datasheet.",
+      "id": "client-2"
+    },
+    {
+      "name": "Client 3",
+      "site_id": "remote-3",
+      "role": "client",
+      "equipment": "Ubiquiti LiteBeam 5AC Gen2",
+      "protocol": "airmax-ac",
+      "frequency_ghz": 5.8,
+      "channel_width_mhz": 20,
+      "tx_power_dbm": 20,
+      "rx_threshold_dbm": -85,
+      "gain_dbi": 23,
+      "az_beamwidth_deg": 7,
+      "el_beamwidth_deg": 7,
+      "pattern_floor_db": 30,
+      "height_m": 20,
+      "polarization": "dual",
+      "feeder_loss_db": 0,
+      "aim": "peer",
+      "azimuth_deg": 0,
+      "tilt_deg": 0,
+      "max_clients": null,
+      "assumptions": "TX 20 dBm and RX -85 dBm are planning assumptions; replace for the selected bandwidth/MCS. Quadratic antenna pattern is approximate. Beamwidths are provisional editable approximations until verified against the specific antenna datasheet.",
+      "id": "client-3"
+    }
+  ],
+  "links": [
+    {
+      "name": "Sector to remote 1",
+      "a_radio_id": "sector",
+      "b_radio_id": "client-1",
+      "reserve_db": 15,
+      "extra_loss_db": 2,
+      "id": "link-1"
+    },
+    {
+      "name": "Sector to remote 2",
+      "a_radio_id": "sector",
+      "b_radio_id": "client-2",
+      "reserve_db": 15,
+      "extra_loss_db": 2,
+      "id": "link-2"
+    },
+    {
+      "name": "Sector to remote 3",
+      "a_radio_id": "sector",
+      "b_radio_id": "client-3",
+      "reserve_db": 15,
+      "extra_loss_db": 2,
+      "id": "link-3"
+    }
+  ],
+  "terrain_path": "",
+  "earth_k": 1.3333333333333333,
+  "sample_spacing_m": 30,
+  "schema_version": 1
+}
