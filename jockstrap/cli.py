@@ -14,7 +14,20 @@ def main():
     parser.add_argument("--usgs", action="store_true", help="Download required USGS 3DEP source tiles (CONUS)")
     parser.add_argument("--model", choices=("knife-edge", "itm"), default="knife-edge")
     parser.add_argument("--output", help="Save the JSON analysis report")
+    parser.add_argument("--self-test", action="store_true", help="Run the offline packaged application smoke test")
+    parser.add_argument("--self-test-report", help="Write smoke-test results to JSON")
+    parser.add_argument("--self-test-no-gui", action="store_true", help="Skip desktop smoke checks in a headless environment")
     args = parser.parse_args()
+    if args.self_test:
+        from .self_test import run_self_test
+        try:
+            result = run_self_test(gui=not args.self_test_no_gui)
+        except Exception as exc:
+            result = dict(success=False, error=str(exc))
+        if args.self_test_report:
+            Path(args.self_test_report).write_text(json.dumps(result, indent=2)+"\n", encoding="utf-8")
+        print(json.dumps(result, indent=2))
+        raise SystemExit(0 if result['success'] else 1)
     try:
         project = Project.load(args.project) if args.project else Project()
         if args.dem:

@@ -1,18 +1,74 @@
-name: Windows desktop build
+name: Build Jockstrap Windows executable
+
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements.txt pyinstaller
-      - run: python -m unittest discover -s tests -v
-      - run: python -m PyInstaller --noconfirm --onedir --windowed --name Jockstrap --collect-all rasterio --collect-all pyproj --collect-all tkintermapview --collect-all itmlogic --collect-all matplotlib desktop_entry.py
-      - uses: actions/upload-artifact@v4
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r requirements-build.txt
+
+      - name: Read and validate release version
+        id: version
+        shell: pwsh
+        run: |
+          $releaseVersion = (Get-Content .\VERSION -Raw).Trim()
+          if ($releaseVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version' }
+          python -c "import pathlib, tomllib; from jockstrap import __version__; v=pathlib.Path('VERSION').read_text().strip(); assert v == __version__ == tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "version=$releaseVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Generate application icon
+        run: python tools/build_icon.py
+
+      - name: Build portable executable
+        run: python -m PyInstaller --clean --noconfirm jockstrap.spec
+
+      - name: Smoke test packaged executable
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath .\dist\Jockstrap.exe -ArgumentList '--self-test', '--self-test-report', 'packaged-smoke-test.json' -PassThru
+          if (-not $process.WaitForExit(120000)) { $process.Kill(); throw 'Packaged smoke test timed out' }
+          if ($process.ExitCode -ne 0) { throw "Packaged smoke test failed: $($process.ExitCode)" }
+          $report = Get-Content .\packaged-smoke-test.json -Raw | ConvertFrom-Json
+          if (-not $report.success -or -not $report.gui_tested) { throw 'Packaged GUI checks did not pass' }
+          Get-Content .\packaged-smoke-test.json
+
+      - name: Upload smoke-test report
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: Jockstrap-Windows
-          path: dist/Jockstrap/
+          name: Jockstrap-Windows-smoke-report
+          path: packaged-smoke-test.json
+          if-no-files-found: ignore
+
+      - name: Upload Jockstrap.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jockstrap-Windows-${{ steps.version.outputs.version }}
+          path: dist/Jockstrap.exe
+          if-no-files-found: error

@@ -25,9 +25,16 @@ python -m pip install -e .
 jockstrap examples/sector_network.json
 ```
 
-The Windows desktop build workflow is manually triggered under GitHub Actions.
-It produces a folder containing `Jockstrap.exe` and its dependencies. A Windows
-package smoke test is required before treating that artifact as a release.
+The Windows workflow builds automatically on pushes to `main` and can also be
+run manually under GitHub Actions. Download the **Jockstrap-Windows-0.1.0** artifact,
+extract the ZIP and run **Jockstrap.exe**. It is a single portable executable;
+no Python installation is needed. The build tests the packaged terrain/ITM
+calculations, desktop map and terrain-profile window before uploading it.
+
+The executable bundles this README, licensing notices and the example project.
+`Jockstrap.exe --self-test --self-test-report report.json` runs its offline smoke
+checks. The bundled tests do not verify Internet tile availability or real-world
+radio accuracy. Build configuration is maintained in `jockstrap.spec`.
 
 ## First project
 
