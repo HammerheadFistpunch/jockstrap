@@ -19,8 +19,8 @@ class NoDemProductError(RuntimeError):
 
 
 def _tile_id(lat_north: int, lon_west: int) -> str:
-    south = lat_north - 1
-    return f"n{south:02d}w{lon_west:03d}"
+    # USGS one-degree IDs use the NORTHWEST corner, not the south edge.
+    return f"n{lat_north:02d}w{lon_west:03d}"
 
 
 def _current_tile_url(tile_id: str) -> str:
@@ -142,7 +142,7 @@ def _tnm_candidates(requests, lat_north: int, lon_west: int) -> list[str]:
     west = -float(lon_west)
     east = west + 1.0
     bbox = f"{west},{south},{east},{lat_north}"
-    tile = f"n{south:02d}w{lon_west:03d}".lower()
+    tile = _tile_id(lat_north, lon_west).lower()
 
     candidates: list[tuple[bool, str, str]] = []
     seen: set[str] = set()

@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 from concurrent.futures import Future
+from unittest.mock import patch
 
 from jockstrap.engine import analyze_link, analyze_network, antenna_loss, knife_edge_loss
 from jockstrap.equipment import make_radio
@@ -176,6 +177,32 @@ class EngineTests(unittest.TestCase):
 
 
 class TerrainTests(unittest.TestCase):
+    def test_automatic_usgs_tile_uses_northwest_corner_and_caches_it(self):
+        import re
+        import numpy as np
+        import rasterio
+        from rasterio.transform import from_origin
+        from jockstrap.vendor import viewshed_dem
+        self.assertEqual(viewshed_dem._tile_id(41, 112), 'n41w112')
+        downloads = []
+        def download(requests, url, target, timeout=120):
+            match = re.search(r'/n(\d+)w(\d+)/USGS_1_n\d+w\d+\.tif$', url)
+            self.assertIsNotNone(match)
+            north, west = map(int, match.groups())
+            downloads.append((north, west))
+            with rasterio.open(target, 'w', driver='GTiff', width=100, height=100, count=1,
+                               dtype='float32', crs='EPSG:4269', transform=from_origin(-west,north,.01,.01), nodata=-9999) as dst:
+                dst.write(np.full((100,100), 100, dtype='float32'), 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            terrain = RasterTerrain(cache=tmp)
+            project = network(2000)
+            with patch.object(viewshed_dem, '_download_url', side_effect=download):
+                first = terrain.sample(*project.sites)
+                second = terrain.sample(*project.sites)
+            self.assertEqual(downloads, [(41,112)])
+            self.assertIn('USGS_1_n41w112.tif', first.source)
+            self.assertEqual(first.elevations_m, second.elevations_m)
+
     def raster(self, path, nodata=False):
         import numpy as np
         import rasterio
@@ -212,6 +239,15 @@ class TerrainTests(unittest.TestCase):
             self.raster(path)
             with self.assertRaisesRegex(ValueError, 'does not cover'):
                 RasterTerrain(path).sample(*network(50000).sites)
+
+    def test_outside_dem_error_identifies_file_point_bounds_and_remedy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'terrain.tif'
+            self.raster(path)
+            with self.assertRaises(ValueError) as error:
+                RasterTerrain(path).sample(*network(50000).sites)
+            for fragment in ('Selected DEM', 'terrain.tif', 'First uncovered point', 'DEM bounds', 'enable USGS'):
+                self.assertIn(fragment, str(error.exception))
 
     def test_cli_json_output_and_local_dem_end_to_end(self):
         with tempfile.TemporaryDirectory() as tmp:

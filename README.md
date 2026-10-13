@@ -4,7 +4,7 @@ Standalone desktop microwave **PtMP / PtP network planner**, based on selected
 terrain components from Signal Peak (Viewshed). No APRS station acquisition,
 seeds, station corrections, callsigns or dependencies on the Signal Peak app.
 
-Initial development version: **0.1.0**. This is a working planning foundation,
+Initial development version: **0.1.1**. This is a working planning foundation,
 not a calibrated commercial link-design package.
 
 ## Run
@@ -26,7 +26,7 @@ jockstrap examples/sector_network.json
 ```
 
 The Windows workflow builds automatically on pushes to `main` and can also be
-run manually under GitHub Actions. Download the **Jockstrap-Windows-0.1.0** artifact,
+run manually under GitHub Actions. Download the **Jockstrap-Windows-0.1.1** artifact,
 extract the ZIP and run **Jockstrap.exe**. It is a single portable executable;
 no Python installation is needed. The build tests the packaged terrain/ITM
 calculations, desktop map and terrain-profile window before uploading it.
@@ -48,6 +48,9 @@ radio accuracy. Build configuration is maintained in `jockstrap.spec`.
    combined system loss. Double-click a site/radio to edit it, then recalculate.
 6. Select a local metre-elevation GeoTIFF or enable **USGS terrain** for CONUS.
    **Path settings** controls effective Earth radius and sample spacing.
+   USGS terrain takes precedence over a saved local DEM path when enabled.
+   Selecting a local DEM disables USGS terrain. Coverage errors identify the
+   terrain file, its bounds and the first point outside it.
 7. **Analyze network**, then double-click a link to inspect both signal directions,
    aiming, clearance and the terrain/Fresnel profile. Export results as JSON.
 8. Save the network as a versioned JSON project. Results are recalculated, not

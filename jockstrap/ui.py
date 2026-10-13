@@ -247,7 +247,9 @@ class Planner(tk.Tk):
         path = filedialog.askopenfilename(filetypes=[("Elevation GeoTIFF", "*.tif *.tiff")], parent=self)
         if path:
             self.project.terrain_path = str(Path(path).resolve())
+            self.usgs.set(False)
             self.changed()
+            self.status.set(f"Local terrain selected: {Path(path).name}. Enable USGS terrain to use automatic tiles instead.")
 
     def path_settings(self):
         def save(values):
@@ -270,7 +272,7 @@ class Planner(tk.Tk):
         from .engine import analyze_network
         from .terrain import RasterTerrain
         def work():
-            terrain = RasterTerrain(snapshot.terrain_path, spacing_m=snapshot.sample_spacing_m) if snapshot.terrain_path or use_usgs else None
+            terrain = RasterTerrain(None if use_usgs else snapshot.terrain_path, spacing_m=snapshot.sample_spacing_m) if snapshot.terrain_path or use_usgs else None
             return revision, analyze_network(snapshot, terrain, selected_model)
         self.future = Future()
         future = self.future
@@ -281,7 +283,8 @@ class Planner(tk.Tk):
                 future.set_exception(exc)
         # Closing the editor should not wait for remote tile download timeouts.
         threading.Thread(target=run, daemon=True).start()
-        self.status.set("Analyzing network… USGS source tiles may take time to download. The editor remains available.")
+        source = 'automatic USGS tiles' if use_usgs else f'local DEM: {snapshot.terrain_path}' if snapshot.terrain_path else 'provisional free space (no terrain)'
+        self.status.set(f"Analyzing network using {source}. Downloads may take time; the editor remains available.")
 
     def poll(self):
         if self.future and self.future.done():

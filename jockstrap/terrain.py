@@ -58,7 +58,8 @@ class RasterTerrain:
                 if self.path:
                     source = self.path
                 else:
-                    # Reuse Viewshed's source-tile download/catalog recovery only.
+                    # Reuse Viewshed's source-tile download/catalog recovery,
+                    # with the USGS northwest-corner naming correction.
                     # No mosaics, station lists, seeds or resampling are needed.
                     if not (24 <= lat <= 50 and -125 <= lon <= -66):
                         raise ValueError("Automatic 3DEP terrain currently supports CONUS. Select a local metre-elevation GeoTIFF elsewhere.")
@@ -82,7 +83,13 @@ class RasterTerrain:
                 x, y = transform.transform(lon, lat)
                 row, col = src.index(x, y)
                 if not (0 <= row < src.height and 0 <= col < src.width):
-                    raise ValueError("Selected DEM does not cover the complete link.")
+                    from rasterio.warp import transform_bounds
+                    west, south, east, north = transform_bounds(src.crs, 'EPSG:4326', *src.bounds)
+                    kind = 'Selected DEM' if self.path else 'Downloaded USGS tile'
+                    remedy = 'Select a DEM covering both endpoints and the entire path, or enable USGS terrain.' if self.path else 'The downloaded tile has unexpected bounds; inspect or replace this cached tile.'
+                    raise ValueError(f"{kind} does not cover the complete link: {Path(source).name}. "
+                                     f"First uncovered point: latitude {lat:.6f}, longitude {lon:.6f}. "
+                                     f"DEM bounds: latitude {south:.6f}–{north:.6f}, longitude {west:.6f}–{east:.6f}. {remedy}")
                 sample = src.read(1, window=Window(col, row, 1, 1), masked=True)
                 if sample.mask.any() or not math.isfinite(float(sample[0, 0])):
                     raise ValueError("DEM has missing terrain on this path; signal estimate withheld.")

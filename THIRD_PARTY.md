@@ -5,9 +5,12 @@ Source repository: https://github.com/HammerheadFistpunch/Viewshed
 Pinned donor commit: `b07cde8c32fc6d131bbc8d75adb802916f115696`
 (branch `feature/microwave-propagation`, retrieved 2026-10-13).
 
-- `jockstrap/vendor/viewshed_dem.py` is an unchanged copy of `dem_sources.py`.
+- `jockstrap/vendor/viewshed_dem.py` is based on `dem_sources.py`.
   Only its independent source-tile acquisition helpers are used by Jockstrap.
   Its station/mosaic preparation interface is retained for provenance but unused.
+  Jockstrap corrects one-degree tile IDs and TNM fallback matching to use USGS's
+  northwest-corner naming. The donor's south-edge convention selected the tile
+  one degree south when requested individually; the older area mosaic could mask it.
 - `jockstrap/itm.py` adapts the isolated `_itm_loss_for_slice` computation and
   polarization initialization from `aprs_viewshed_utah_parallel.py`. It imports
   no APRS module. Fixed environmental assumptions are exposed in analysis warnings.

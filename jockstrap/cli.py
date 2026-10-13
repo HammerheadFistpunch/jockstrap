@@ -18,6 +18,8 @@ def main():
     parser.add_argument("--self-test-report", help="Write smoke-test results to JSON")
     parser.add_argument("--self-test-no-gui", action="store_true", help="Skip desktop smoke checks in a headless environment")
     args = parser.parse_args()
+    if args.dem and args.usgs:
+        parser.error("Choose --dem or --usgs, not both.")
     if args.self_test:
         from .self_test import run_self_test
         try:
@@ -39,7 +41,7 @@ def main():
                 parser.error("--analyze needs a project file")
             from .engine import analyze_network
             from .terrain import RasterTerrain
-            terrain = RasterTerrain(project.terrain_path, spacing_m=project.sample_spacing_m) if project.terrain_path or args.usgs else None
+            terrain = RasterTerrain(None if args.usgs else project.terrain_path, spacing_m=project.sample_spacing_m) if project.terrain_path or args.usgs else None
             # Donor download progress goes to stderr; stdout stays valid JSON.
             import contextlib, sys
             with contextlib.redirect_stdout(sys.stderr):
