@@ -185,7 +185,7 @@ class Planner(tk.Tk):
     def radio_dialog(self, radio, existing):
         visible = tuple(name for name in PRESETS if not CATALOG.get(name,{}).get('hidden'))
         fields = [("name", "Radio name", None), ("equipment", "Equipment preset", visible),
-                  ("role", "Role", ("sector", "client", "ptp")), ("protocol", "Protocol family", ("custom", "airmax-ac", "ltu", "wifi-ax", "epmp", "omada-bridge", "omada-mesh", "pharos-ac", "pharos-n")),
+                  ("role", "Role", ("sector", "client", "ptp")), ("protocol", "Protocol family", ("custom", "airmax-ac", "ltu", "airfiber", "wifi-ax", "wifi-ac", "epmp", "epmp-6", "mimosa5", "mimosa6", "mimosa-backhaul", "omada-bridge", "omada-mesh", "pharos-ac", "pharos-n")),
                   ("hardware_revision", "Hardware revision", None),
                   ("wireless_mode", "Wireless mode", ("standard", "maxtream", "tdma", "mesh")),
                   ("antenna_pattern", "Antenna pattern", ("directional", "omni")),
@@ -245,9 +245,9 @@ class Planner(tk.Tk):
 
     def radio_catalog(self):
         window=tk.Toplevel(self)
-        window.title('TP-Link outdoor radio catalog and compatibility')
+        window.title('Outdoor transceiver catalog and compatibility')
         window.geometry('1150x750')
-        ttk.Label(window,text='US-listed outdoor radios/APs, plus labelled regional, older-revision and coming-soon models. Checked 2026-10-13. Match bands, revisions and wireless mode; shared management is not shared radio compatibility.',wraplength=1100,padding=10).pack(fill='x')
+        ttk.Label(window,text='TP-Link, Ubiquiti, MikroTik, Cambium and Mimosa outdoor transceivers. Manufacturer listings checked 2026-10-13; stock varies. External-antenna radios need antenna configuration. Modelled bands: 2.4/5/6 GHz; 60 GHz is outside this engine.',wraplength=1100,padding=10).pack(fill='x')
         table=ttk.Treeview(window,columns=('Category','Availability','Bands'),height=15)
         table.heading('#0',text='Equipment / band / hardware')
         table.column('#0',width=430)
@@ -255,16 +255,25 @@ class Planner(tk.Tk):
             table.heading(column,text=column)
             table.column(column,width=180)
         table.pack(fill='both',expand=True,padx=10)
-        for name,entry in CATALOG.items():
-            if not entry.get('hidden'):
-                table.insert('','end',iid=name,text=name,values=(entry['category'],entry['status'],', '.join(str(b) for b in entry['bands'])+' GHz'))
+        filter_frame=ttk.Frame(window,padding=6)
+        filter_frame.pack(fill='x',before=table)
+        ttk.Label(filter_frame,text='Brand').pack(side='left')
+        brand=tk.StringVar(value='All brands')
+        ttk.Combobox(filter_frame,textvariable=brand,state='readonly',values=('All brands',*sorted({e['brand'] for e in CATALOG.values()})),width=20).pack(side='left',padx=8)
+        def populate(*_):
+            table.delete(*table.get_children())
+            for name,entry in CATALOG.items():
+                if not entry.get('hidden') and (brand.get()=='All brands' or entry['brand']==brand.get()):
+                    table.insert('','end',iid=name,text=name,values=(entry['category'],entry['status'],', '.join(str(b) for b in entry['bands'])+' GHz'))
+        brand.trace_add('write',populate)
+        populate()
         note=tk.StringVar(value='Select a product to see its pairing rules and manufacturer reference.')
         ttk.Label(window,textvariable=note,wraplength=1100,padding=10).pack(fill='x')
         selected_source=['']
         def selected(*_):
             if table.selection():
                 entry=CATALOG[table.selection()[0]]
-                note.set(entry['note']+'\n'+entry['source'])
+                note.set(f"{entry['brand']} | {entry['status']} | Checked {entry['checked']}\n"+entry['note']+'\n'+entry['source'])
                 selected_source[0]=entry['source']
         table.bind('<<TreeviewSelect>>',selected)
         def reference():

@@ -1,6 +1,7 @@
 """Configuration-aware link compatibility; uncertain pairings stay uncertain."""
 import re
-from .tplink_catalog import CATALOG, PAIRING_SOURCE
+from .catalog import CATALOG
+from .tplink_catalog import PAIRING_SOURCE
 
 
 def catalog_entry(radio):
@@ -37,6 +38,46 @@ def compatibility(a,b):
                     return result('Incompatible',f"{entry['model']} does not support this channel width.")
             if entry.get('ap_only') and radio.role!='sector':
                 return result('Incompatible',f"{entry['model']} is a hub, not a client radio.")
+            if entry.get('widths') and radio.channel_width_mhz not in entry['widths']:
+                return result('Incompatible',f"{entry['model']}: channel width is outside this catalog profile.")
+    if any(e and e['brand']!='TP-Link' for e in (ea,eb)):
+        if not ea or not eb:
+            return result('Unverified','Choose catalog equipment at both ends to check hardware pairing.')
+        fa,fb=ea['radio']['protocol'],eb['radio']['protocol']
+        wifi={'wifi-ax','wifi-ac','pharos-n','pharos-ac','omada-mesh'}
+        if ea['brand']!=eb['brand'] or fa!=fb:
+            if fa in wifi and fb in wifi:
+                if a.wireless_mode!='standard' or b.wireless_mode!='standard':
+                    return result('Incompatible','Cross-vendor Wi-Fi requires standard mode, not proprietary TDMA/MAXtream/mesh.')
+                return result('Conditional','Standard Wi-Fi association may work with matching security and common PHY modes. Transparent Ethernet bridging is not established across vendors/drivers.')
+            return result('Incompatible','Different proprietary radio families; shared bands or management do not establish interoperability.')
+        if a.wireless_mode!=b.wireless_mode:
+            return result('Incompatible','Wireless modes differ.')
+        if fa.startswith('wifi-'):
+            if a.wireless_mode!='standard':
+                return result('Incompatible','This profile uses standard Wi-Fi. AX WiFi drivers do not support Nv2/Nstreme; legacy driver selection must be verified separately.')
+            return result('Conditional','Same-band MikroTik Wi-Fi peers. Verify AP/station roles, common PHY modes, security, driver packages and transparent station-bridge configuration.')
+        if a.wireless_mode not in ('standard','tdma'):
+            return result('Incompatible','Unsupported wireless mode for this proprietary radio family.')
+        if a.role==b.role=='sector':
+            return result('Incompatible','Two hub radios do not form a hub/client link; configure a supported station or PTP peer.')
+        hub=a if a.role=='sector' else b if b.role=='sector' else None
+        if fa=='airmax-ac' and hub and a.channel_width_mhz>40:
+            return result('Incompatible','airMAX AC PtMP uses channel widths up to 40 MHz in these profiles; wider widths require supported PTP mode.')
+        for radio,entry in ((a,ea),(b,eb)):
+            if entry.get('external_antenna') and radio.gain_dbi==0:
+                return result('Unverified','External antenna has not been configured: enter its actual gain, beamwidth and feeder loss. Radio-family pairing alone is insufficient for a usable link budget.')
+        if fa in ('airfiber','mimosa-backhaul'):
+            if ea['model']!=eb['model']:
+                return result('Unverified','Backhaul model/firmware pairing has not been verified.')
+            if a.role!='ptp' or b.role!='ptp':
+                return result('Incompatible','Dedicated backhaul profiles require PTP roles at both ends.')
+            return result('Conditional','Matching dedicated PTP models; verify firmware, security and channel configuration.')
+        if not hub:
+            if fa=='airmax-ac' and a.role==b.role=='ptp':
+                return result('Conditional','airMAX AC PTP peers; configure one AP and one station on supported firmware with matching security.')
+            return result('Unverified','Two subscriber radios need explicitly supported PTP firmware and roles; client-to-client compatibility is not assumed.')
+        return result('Conditional','Documented hub/client family. Match firmware, security, country settings and network mode; RF estimates do not predict throughput or airtime capacity.')
     if 'custom' in (a.protocol,b.protocol):
         return result('Unverified','Generic/custom equipment: no hardware interoperability claim.')
     if ea and eb:

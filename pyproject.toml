@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jockstrap-planner"
-version = "0.1.2"
+version = "0.1.3"
 description = "Standalone microwave PtMP and PtP network planner"
 requires-python = ">=3.11"
 license = {text = "GPL-2.0"}

@@ -1,6 +1,6 @@
 """Antenna presets, never implicit rate-specific factory link budgets."""
 from .project import Radio
-from .tplink_catalog import CATALOG
+from .catalog import CATALOG
 
 PRESETS = {
     "Generic sector": dict(role="sector", protocol="custom", gain_dbi=16, az_beamwidth_deg=90, el_beamwidth_deg=10),

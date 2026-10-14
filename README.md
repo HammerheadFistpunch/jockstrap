@@ -4,7 +4,7 @@ Standalone desktop microwave **PtMP / PtP network planner**, based on selected
 terrain components from Signal Peak (Viewshed). No APRS station acquisition,
 seeds, station corrections, callsigns or dependencies on the Signal Peak app.
 
-Initial development version: **0.1.2**. This is a working planning foundation,
+Initial development version: **0.1.3**. This is a working planning foundation,
 not a calibrated commercial link-design package.
 
 ## Run
@@ -26,7 +26,7 @@ jockstrap examples/sector_network.json
 ```
 
 The Windows workflow builds automatically on pushes to `main` and can also be
-run manually under GitHub Actions. Download the **Jockstrap-Windows-0.1.2** artifact,
+run manually under GitHub Actions. Download the **Jockstrap-Windows-0.1.3** artifact,
 extract the ZIP and run **Jockstrap.exe**. It is a single portable executable;
 no Python installation is needed. The build tests the packaged terrain/ITM
 calculations, desktop map and terrain-profile window before uploading it.
@@ -67,13 +67,13 @@ TX power and receiver threshold are explicitly **planning assumptions**, not
 guaranteed manufacturer specifications for a bandwidth/modulation. Some antenna
 beamwidths are also provisional approximations; their equipment notes say so.
 
-**Radio catalog** lists the TP-Link US outdoor radio/bridge/AP lineup checked on
+**Radio catalog** includes Ubiquiti, MikroTik, Cambium and Mimosa outdoor transceivers, alongside the TP-Link US outdoor radio/bridge/AP lineup checked on
 2026-10-13, including labelled regional and coming-soon products. It contains a
 pairing comparison tool and manufacturer references. Outdoor AP presets have
 separate bands and antenna modes; Omada bridge kits have explicit hardware
 revision presets. Existing unversioned bridge presets remain readable but their
 revision-sensitive pairing is marked unverified until the revision is supplied.
-See [TP_LINK_CATALOG.md](docs/TP_LINK_CATALOG.md).
+See [TP_LINK_CATALOG.md](docs/TP_LINK_CATALOG.md) and [WIRELESS_CATALOG.md](docs/WIRELESS_CATALOG.md).
 
 Link selection and reports distinguish Compatible, Conditional, Incompatible
 and Unverified. Labels do not guarantee signal, security configuration or

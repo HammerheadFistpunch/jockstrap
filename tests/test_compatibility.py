@@ -12,7 +12,7 @@ class CompatibilityTests(unittest.TestCase):
         return first,second
 
     def test_current_us_lineup_and_regional_labels(self):
-        models={entry['model'] for entry in CATALOG.values()}
+        models={entry['model'] for entry in CATALOG.values() if entry['brand']=='TP-Link'}
         expected={'CPE210','CPE220','CPE510','CPE605','CPE610','CPE710',
                   'EAP100-Bridge','EAP115-Bridge','EAP211-Bridge','EAP215-Bridge',
                   'Flex Bridge 5','Sector Bridge 5','Beam Bridge 5 UR','Beam Bridge 7',
@@ -103,3 +103,59 @@ class CompatibilityTests(unittest.TestCase):
 
 
 if __name__=='__main__': unittest.main()
+
+class OtherBrandsTests(unittest.TestCase):
+    def pair(self,first,second):
+        return make_radio('a',first),make_radio('b',second)
+
+    def test_new_catalog_has_only_transceivers_and_valid_references(self):
+        from jockstrap.wireless_catalog import CATALOG as other
+        self.assertEqual({e['brand'] for e in other.values()}, {'Ubiquiti','MikroTik','Cambium','Mimosa'})
+        for name,e in other.items():
+            self.assertTrue(e['source'].startswith('https://'),name)
+            self.assertIn(e['radio']['role'],('sector','client','ptp'))
+            self.assertIn('planning assumptions',e['note'])
+
+    def test_airmax_ltu_and_cross_brand_proprietary_do_not_interoperate(self):
+        for first,second in [('Ubiquiti LiteBeam 5AC Gen2','Ubiquiti LTU Pro'),
+                             ('Ubiquiti LiteBeam 5AC Gen2','TP-Link CPE710'),
+                             ('Ubiquiti LiteBeam 5AC Gen2','Cambium Force 4525')]:
+            self.assertEqual(compatibility(*self.pair(first,second))['status'],'Incompatible')
+
+    def test_external_antenna_needs_configuration_before_pairing_claim(self):
+        a,b=self.pair('Ubiquiti Rocket Prism 5AC Gen2','Ubiquiti LiteBeam 5AC Gen2')
+        self.assertEqual(a.gain_dbi,0)
+        self.assertEqual(compatibility(a,b)['status'],'Unverified')
+        a.gain_dbi=21
+        self.assertEqual(compatibility(a,b)['status'],'Conditional')
+        a.channel_width_mhz=b.channel_width_mhz=80
+        self.assertEqual(compatibility(a,b)['status'],'Incompatible')
+
+    def test_mikrotik_wifi_and_cross_vendor_bridging_are_conditional(self):
+        a,b=self.pair('MikroTik mANTBox ax 15s','MikroTik SXTsq 5 ax')
+        self.assertEqual(compatibility(a,b)['status'],'Conditional')
+        a.wireless_mode=b.wireless_mode='tdma'
+        self.assertEqual(compatibility(a,b)['status'],'Incompatible')
+        a,b=self.pair('MikroTik SXTsq 5 ax','TP-Link CPE710')
+        self.assertEqual(compatibility(a,b)['status'],'Conditional')
+        b.wireless_mode='maxtream'
+        self.assertEqual(compatibility(a,b)['status'],'Incompatible')
+
+    def test_epmp_generation_and_subscriber_pairs(self):
+        a,b=self.pair('Cambium ePMP 4500L','Cambium Force 300-25')
+        a.gain_dbi=17
+        self.assertEqual(compatibility(a,b)['status'],'Conditional')
+        a,b=self.pair('Cambium Force 4625','Cambium Force 4525')
+        b.frequency_ghz=6.5
+        self.assertEqual(compatibility(a,b)['status'],'Incompatible')
+        a,b=self.pair('Ubiquiti LTU Pro','Ubiquiti LTU Long-Range')
+        self.assertEqual(compatibility(a,b)['status'],'Unverified')
+
+    def test_mimosa_base_gain_and_dedicated_backhaul(self):
+        a,b=self.pair('Mimosa A6 — 6 GHz','Mimosa C6x (base 8 dBi) — 6 GHz')
+        self.assertEqual((a.gain_dbi,b.gain_dbi),(16,8))
+        self.assertEqual(compatibility(a,b)['status'],'Conditional')
+        a,b=self.pair('Mimosa B5x (base 8 dBi)','Mimosa B5x (base 8 dBi)')
+        self.assertEqual(compatibility(a,b)['status'],'Conditional')
+        b.role='client'
+        self.assertEqual(compatibility(a,b)['status'],'Incompatible')
